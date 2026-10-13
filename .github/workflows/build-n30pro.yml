@@ -1,37 +1,52 @@
-name: 编译磊科 N30Pro 固件
+name: Build Netcore N30 Pro closed-source Wi-Fi firmware
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       ssh:
-        description: '是否开启 SSH 调试 (true/false)'
+        description: Enable tmate debugging
         required: false
-        default: 'false'
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: n30pro-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-  REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
-  REPO_BRANCH: openwrt-24.10-6.6
-  CONFIG_FILE: defconfig/n30pro.config
+  SOURCE_REPO: https://github.com/padavanonly/immortalwrt-mt798x-6.6.git
+  SOURCE_BRANCH: openwrt-24.10-6.6
+  SOURCE_COMMIT: ec9ef10efc65da1e6d1de4e2c043c0e13d08eed8
+  DEVICE_PATCH_REPO: https://github.com/liuyi-htu/Netcore-N30-Pro-patch-for-OpenWrt.git
+  DEVICE_PATCH_COMMIT: f8be85f26ce88f435389a112d9196a8159503ff2
   TZ: Asia/Shanghai
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
     steps:
-      - name: 检出本仓库
-        uses: actions/checkout@v4
+      - name: Checkout build repository
+        uses: actions/checkout@v5
 
-      - name: 初始化编译环境
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
+      - name: Install build dependencies
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          sudo apt-get update -y
-          sudo apt-get full-upgrade -y
+          sudo apt-get update
           sudo apt-get install -y \
             ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
             bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk \
@@ -43,197 +58,109 @@ jobs:
             python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig \
             texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
           sudo timedatectl set-timezone "$TZ"
-          sudo mkdir -p /workdir
-          sudo chown $USER:$GROUPS /workdir
 
-      - name: 克隆源码
-        working-directory: /workdir
+      - name: Clone pinned source and device adaptation
         run: |
-          df -hT $PWD
-          git clone -b $REPO_BRANCH --single-branch --filter=blob:none $REPO_URL openwrt
-          ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+          git clone --branch "$SOURCE_BRANCH" --single-branch --filter=blob:none "$SOURCE_REPO" openwrt
+          git -C openwrt checkout "$SOURCE_COMMIT"
+          git clone --filter=blob:none "$DEVICE_PATCH_REPO" n30pro-patch
+          git -C n30pro-patch checkout "$DEVICE_PATCH_COMMIT"
+          printf 'Source: '; git -C openwrt rev-parse HEAD
+          printf 'Device patch: '; git -C n30pro-patch rev-parse HEAD
 
-      # ============================================================
-      # 注入 N30Pro 设备支持文件
-      # ============================================================
-      - name: 注入 N30Pro DTS 文件
+      - name: Apply N30 Pro support and proprietary mt_wifi adaptation
+        working-directory: openwrt
         run: |
-          echo ">>> 复制 DTS 文件到源码..."
-          cp $GITHUB_WORKSPACE/dts/mt7981b-netcore-n30pro.dts \
-             /workdir/openwrt/target/linux/mediatek/dts/mt7981b-netcore-n30pro.dts
-          cp $GITHUB_WORKSPACE/dts/mt7981b-netis-common.dtsi \
-             /workdir/openwrt/target/linux/mediatek/dts/mt7981b-netis-common.dtsi
-          echo ">>> DTS 文件已注入"
-          ls -la /workdir/openwrt/target/linux/mediatek/dts/ | grep n30pro
-          ls -la /workdir/openwrt/target/linux/mediatek/dts/ | grep netis
+          bash ../n30pro-patch/scripts/apply-netcore-n30pro.sh ../n30pro-patch
+          dts=target/linux/mediatek/dts/mt7981b-netcore-n30-pro.dts
+          mk=target/linux/mediatek/image/filogic.mk
+          sed -i '/nvmem-cell-names = "eeprom";/d; /nvmem-cells = <&eeprom_factory_0>;/d' "$dts"
+          sed -i '/&wifi {/a\	mediatek,mtd-eeprom = <&factory 0x0>;' "$dts"
+          sed -i '/define Device\/netcore_n30-pro/,/endef/ s/kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware //' "$mk"
+          grep -q 'mediatek,mtd-eeprom = <&factory 0x0>;' "$dts"
+          ! sed -n '/define Device\/netcore_n30-pro/,/endef/p' "$mk" | grep -q 'kmod-mt7915e'
+          grep -A18 'define Device/netcore_n30-pro' "$mk"
+          grep -A5 '&wifi' "$dts"
 
-      - name: 注入 N30Pro 设备定义到 filogic.mk
+      - name: Add feeds and customize defaults
+        working-directory: openwrt
         run: |
-          FILOGIC_MK="/workdir/openwrt/target/linux/mediatek/image/filogic.mk"
-          echo ">>> 向 filogic.mk 追加 N30Pro 设备定义..."
-
-          # 检查是否已存在 (避免重复添加)
-          if grep -q "netcore_n30pro" "$FILOGIC_MK"; then
-            echo ">>> N30Pro 定义已存在，跳过"
-          else
-            echo "" >> "$FILOGIC_MK"
-            echo "# ======== Netcore N30PRO (MT7981B + NAND) ========" >> "$FILOGIC_MK"
-            echo "define Device/netcore_n30pro" >> "$FILOGIC_MK"
-            echo "  DEVICE_VENDOR := Netcore" >> "$FILOGIC_MK"
-            echo "  DEVICE_MODEL := N30PRO" >> "$FILOGIC_MK"
-            echo "  DEVICE_ALT0_VENDOR := netis" >> "$FILOGIC_MK"
-            echo "  DEVICE_ALT0_MODEL := NX35U" >> "$FILOGIC_MK"
-            echo "  DEVICE_DTS := mt7981b-netcore-n30pro" >> "$FILOGIC_MK"
-            echo "  DEVICE_DTS_DIR := ../dts" >> "$FILOGIC_MK"
-            echo "  DEVICE_DTC_FLAGS := --pad 4096" >> "$FILOGIC_MK"
-            echo "  DEVICE_DTS_LOADADDR := 0x43f00000" >> "$FILOGIC_MK"
-            echo "  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3 kmod-usb-ledtrig-usbport" >> "$FILOGIC_MK"
-            echo "  KERNEL_LOADADDR := 0x44000000" >> "$FILOGIC_MK"
-            echo "  KERNEL := kernel-bin | gzip" >> "$FILOGIC_MK"
-            echo '  KERNEL_INITRAMFS := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k' >> "$FILOGIC_MK"
-            echo "  KERNEL_INITRAMFS_SUFFIX := .itb" >> "$FILOGIC_MK"
-            echo "  KERNEL_IN_UBI := 1" >> "$FILOGIC_MK"
-            echo "  UBOOTENV_IN_UBI := 1" >> "$FILOGIC_MK"
-            echo "  IMAGES := sysupgrade.itb" >> "$FILOGIC_MK"
-            echo "  IMAGE_SIZE := 117248k" >> "$FILOGIC_MK"
-            echo '  IMAGE/sysupgrade.itb := append-kernel | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-with-rootfs | pad-rootfs | append-metadata' >> "$FILOGIC_MK"
-            echo "endef" >> "$FILOGIC_MK"
-            echo "TARGET_DEVICES += netcore_n30pro" >> "$FILOGIC_MK" 
-            echo ">>> N30Pro 设备定义已追加到 filogic.mk"
-          fi
-
-          # 验证
-          grep -A 5 "Device/netcore_n30pro" "$FILOGIC_MK" | head -10
-
-      # ============================================================
-      # 添加 Feeds 和插件
-      # ============================================================
-
-
-
-
-
-      - name: 删除报错的 5G 模块
-        working-directory: /workdir/openwrt
-        run: |
-          echo ">>> 强行删除 5g-modem 文件夹，防止编译错误"
-          rm -rf package/mtk/applications/5g-modem
-          rm -rf package/mtk/applications/quectel_MHI
-
-      - name: 更新并安装 Feeds
-        working-directory: /workdir/openwrt
-        run: |
+          bash "$GITHUB_WORKSPACE/scripts/diy-script.sh"
           ./scripts/feeds update -a
-          # 临时解决 Rust 编译依赖预编译 llvm 可能带来的失败问题
           sed -i 's/ci-llvm=true/ci-llvm=false/g' feeds/packages/lang/rust/Makefile || true
           ./scripts/feeds install -a
-                              echo ">>> Feeds 安装完成"
+          bash "$GITHUB_WORKSPACE/scripts/diy-6.6.sh"
 
-      # ============================================================
-      # 加载配置
-      # ============================================================
-      - name: 加载自定义配置
-        working-directory: /workdir/openwrt
+      - name: Generate and verify build configuration
+        working-directory: openwrt
         run: |
-          cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
+          cp defconfig/mt7981-ax3000.config .config
+          sed -i '/^CONFIG_TARGET_DEVICE_mediatek_.*_DEVICE_/d' .config
+          sed -i '/^CONFIG_TARGET_DEVICE_PACKAGES_mediatek_.*_DEVICE_/d' .config
+          sed -i '/^CONFIG_TARGET_MULTI_PROFILE=/d' .config
+          cat "$GITHUB_WORKSPACE/configs/6.6.txt" >> .config
           make defconfig
-          echo ">>> 配置加载完成，目标设备："
-          grep "DEVICE_netcore_n30pro" .config
+          grep -q '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netcore_n30-pro=y$' .config
+          grep -q '^CONFIG_PACKAGE_kmod-mt_wifi=y$' .config
+          ! grep -q '^CONFIG_PACKAGE_kmod-mt7915e=y$' .config
+          for p in store openclash turboacc-mtk samba4 ttyd nlbwmon upnp filemanager; do
+            grep -q "^CONFIG_PACKAGE_luci-app-$p=y$" .config
+          done
+          grep -q '^CONFIG_PACKAGE_tailscale=y$' .config
+          grep -E 'DEVICE_netcore_n30-pro|PACKAGE_kmod-mt_wifi=|PACKAGE_luci-app-(store|openclash|turboacc-mtk|samba4|ttyd|nlbwmon|upnp|filemanager)=|PACKAGE_tailscale=' .config
 
-      - name: SSH 调试 (可选)
+      - name: Optional tmate debugging
         uses: mxschmitt/action-tmate@v3
         if: github.event.inputs.ssh == 'true'
         with:
           limit-access-to-actor: true
 
-      - name: 下载依赖包
-        working-directory: /workdir/openwrt
+      - name: Download sources
+        working-directory: openwrt
         run: |
           make download -j8
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
+          find dl -size -1024c -print -delete
 
-      # ============================================================
-      # 开始编译
-      # ============================================================
-      - name: 开始编译
-        id: compile
-        working-directory: /workdir/openwrt
+      - name: Build firmware
+        working-directory: openwrt
+        run: make -j"$(nproc)" || make -j1 V=s
+
+      - name: Collect and inspect firmware
         run: |
-          echo -e "$(nproc) 线程编译"
-          make -j$(nproc) || make -j1 || make -j1 V=s
-          echo "status=success" >> $GITHUB_OUTPUT
-          echo "FILE_DATE=$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+          out=openwrt/bin/targets/mediatek/filogic
+          mkdir -p firmware
+          find "$out" -maxdepth 1 -type f \
+            \( -name '*netcore_n30-pro*' -o -name 'sha256sums' -o -name 'profiles.json' \) \
+            -exec cp -v {} firmware/ \;
+          find firmware -maxdepth 1 -type f -print -exec file {} \;
+          test -n "$(find firmware -maxdepth 1 -type f -name '*netcore_n30-pro*squashfs-sysupgrade.bin' -print -quit)"
+          sha256sum firmware/* > firmware/SHA256SUMS
+          date '+%Y.%m.%d-%H%M' > firmware/BUILD_TAG
+          echo "BUILD_TAG=$(cat firmware/BUILD_TAG)" >> "$GITHUB_ENV"
 
-      - name: 检查磁盘空间
-        if: (!cancelled())
-        run: df -hT
-
-      # ============================================================
-      # 上传固件
-      # ============================================================
-      - name: 整理固件文件
-        if: steps.compile.outputs.status == 'success'
-        run: |
-          cd /workdir/openwrt/bin/targets/mediatek/filogic/
-          echo ">>> 编译产出文件："
-          ls -la
-          # 仅保留 N30Pro 相关文件
-          mkdir -p /tmp/n30pro-firmware
-          cp *netcore_n30pro* /tmp/n30pro-firmware/ 2>/dev/null || true
-          ls -la /tmp/n30pro-firmware/
-
-      - name: 上传固件到 Artifacts
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
-        if: steps.compile.outputs.status == 'success'
         with:
-          name: 磊科N30Pro固件_${{ env.FILE_DATE }}
-          path: /workdir/openwrt/bin/targets/mediatek/filogic/*netcore_n30pro*
-          retention-days: 14
+          name: netcore-n30pro-closed-wifi-${{ env.BUILD_TAG }}
+          path: firmware/
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: 创建 Release
-        uses: ncipollo/release-action@v1
-        if: steps.compile.outputs.status == 'success'
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
         with:
-          tag: N30Pro-${{ env.FILE_DATE }}
-          name: 磊科 N30Pro 固件 ${{ env.FILE_DATE }}
+          tag_name: n30pro-${{ env.BUILD_TAG }}
+          name: Netcore N30 Pro closed-source Wi-Fi ${{ env.BUILD_TAG }}
+          prerelease: true
+          generate_release_notes: false
           body: |
-            ## 磊科 N30Pro ImmortalWrt 固件
+            Netcore N30 Pro custom ImmortalWrt firmware.
 
-            ### 固件信息
-            - **源码**: padavanonly/immortalwrt-mt798x-6.6
-            - **分支**: openwrt-24.10-6.6
-            - **编译时间**: ${{ env.FILE_DATE }}
+            - Source: padavanonly/immortalwrt-mt798x-6.6 (`openwrt-24.10-6.6`)
+            - Wi-Fi: MediaTek proprietary MT7981/MT7976 `mt_wifi`
+            - LAN: 192.168.6.1
+            - Initial root password: empty; set it immediately after first login
+            - Included: iStore, OpenClash with embedded Meta core, TurboACC/HNAT/WED, ttyd, Samba4/USB storage, nlbwmon, UPnP, file manager, Tailscale and kmod-tun
 
-            ### 硬件配置
-            - CPU: MT7981B 双核 1.3GHz
-            - RAM: 512MB
-            - Flash: 128MB NAND
-            - 交换机: MT7531AE
-            - 无线: MT7976CN (2.4GHz + 5GHz)
-            - 网口: 1x WAN + 4x LAN
-            - USB: 3.0 x1
-
-            ### 内置插件
-            - ✅ OpenClash (代理工具)
-            - ✅ iStore (应用商店)
-            - ✅ USB 上网 / 网络共享 (4G/5G 网卡)
-            - ✅ ttyd (Web 终端)
-            - ✅ 文件浏览器
-            - ✅ MTK 硬件加速 (TurboACC)
-            - ✅ MTWIFI 无线配置
-
-            ### 刷机说明
-            > ⚠️ 需要先刷入 hanwckf 大佬编译的 RAX3000M NAND 版 uboot
-            
-            1. 通过 uboot Web 界面上传 `sysupgrade.itb` 文件
-            2. 等待重启完成
-            3. 默认 IP: 192.168.1.1 / 无密码
-
-            ### 文件说明
-            - `*sysupgrade.itb` — 升级固件 (通过 uboot 或 LuCI 刷入)
-            - `*spim-nand-preloader.bin` — BL2 预加载器 (通常不需要)
-            - `*spim-nand-bl31-uboot.fip` — FIP uboot 文件 (通常不需要)
-          artifacts: /workdir/openwrt/bin/targets/mediatek/filogic/*netcore_n30pro*
-          allowUpdates: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+            This is an untested prerelease. Keep a known-good recovery method and the original firmware backup. Do not flash bootloader partitions with these system images.
+          files: firmware/*
