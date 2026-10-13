@@ -100,13 +100,26 @@ jobs:
           sed -i '/^CONFIG_TARGET_MULTI_PROFILE=/d' .config
           cat "$GITHUB_WORKSPACE/configs/6.6.txt" >> .config
           make defconfig
-          grep -q '^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netcore_n30-pro=y$' .config
-          grep -q '^CONFIG_PACKAGE_kmod-mt_wifi=y$' .config
-          ! grep -q '^CONFIG_PACKAGE_kmod-mt7915e=y$' .config
+          echo 'Resolved target, Wi-Fi and requested package configuration:'
+          grep -E 'TARGET_(mediatek|DEVICE_).*netcore|TARGET_mediatek|PACKAGE_(kmod-mt_wifi|kmod-mt7915e|luci-app-|tailscale)' .config || true
+
+          require_config() {
+            if ! grep -q "^$1=y$" .config; then
+              echo "Missing required configuration: $1=y" >&2
+              exit 1
+            fi
+          }
+
+          require_config 'CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netcore_n30-pro'
+          require_config 'CONFIG_PACKAGE_kmod-mt_wifi'
+          if grep -q '^CONFIG_PACKAGE_kmod-mt7915e=y$' .config; then
+            echo 'Open-source kmod-mt7915e was unexpectedly selected' >&2
+            exit 1
+          fi
           for p in store openclash turboacc-mtk samba4 ttyd nlbwmon upnp filemanager; do
-            grep -q "^CONFIG_PACKAGE_luci-app-$p=y$" .config
+            require_config "CONFIG_PACKAGE_luci-app-$p"
           done
-          grep -q '^CONFIG_PACKAGE_tailscale=y$' .config
+          require_config 'CONFIG_PACKAGE_tailscale'
           grep -E 'DEVICE_netcore_n30-pro|PACKAGE_kmod-mt_wifi=|PACKAGE_luci-app-(store|openclash|turboacc-mtk|samba4|ttyd|nlbwmon|upnp|filemanager)=|PACKAGE_tailscale=' .config
 
       - name: Optional tmate debugging
