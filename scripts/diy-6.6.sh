@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+# Ship Argon as the default LuCI theme. The package selection alone only
+# installs the theme and otherwise leaves LuCI using Bootstrap.
+sed -i "s|option mediaurlbase '/luci-static/bootstrap'|option mediaurlbase '/luci-static/argon'|" \
+  feeds/luci/modules/luci-base/root/etc/config/luci
+
 rm -rf package/luci-app-openclash
 git clone --depth=1 https://github.com/vernesong/OpenClash.git /tmp/OpenClash
 cp -a /tmp/OpenClash/luci-app-openclash package/luci-app-openclash

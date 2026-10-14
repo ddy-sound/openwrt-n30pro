@@ -121,6 +121,8 @@ jobs:
           for p in store openclash turboacc-mtk samba4 ttyd nlbwmon upnp filemanager; do
             require_config "CONFIG_PACKAGE_luci-app-$p"
           done
+          require_config 'CONFIG_PACKAGE_luci-theme-argon'
+          require_config 'CONFIG_PACKAGE_luci-app-argon-config'
           require_config 'CONFIG_PACKAGE_tailscale'
           grep -E 'DEVICE_netcore_n30-pro|PACKAGE_kmod-mt_wifi=|PACKAGE_luci-app-(store|openclash|turboacc-mtk|samba4|ttyd|nlbwmon|upnp|filemanager)=|PACKAGE_tailscale=' .config
 
