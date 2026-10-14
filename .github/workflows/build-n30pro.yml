@@ -176,7 +176,6 @@ jobs:
         with:
           tag_name: n30pro-${{ env.BUILD_TAG }}
           name: Netcore N30 Pro closed-source Wi-Fi ${{ env.BUILD_TAG }}
-          prerelease: true
           generate_release_notes: false
           body: |
             Netcore N30 Pro custom ImmortalWrt firmware.
@@ -187,5 +186,5 @@ jobs:
             - Initial root password: empty; set it immediately after first login
             - Included: iStore, OpenClash with embedded Meta core, TurboACC/HNAT/WED, ttyd, Samba4/USB storage, nlbwmon, UPnP, file manager, Tailscale and kmod-tun
 
-            This is an untested prerelease. Keep a known-good recovery method and the original firmware backup. Do not flash bootloader partitions with these system images.
+            Keep a known-good recovery method and the original firmware backup. Do not flash bootloader partitions with these system images.
           files: firmware/*
