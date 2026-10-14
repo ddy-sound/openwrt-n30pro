@@ -157,7 +157,9 @@ jobs:
             -exec cp -v {} firmware/ \;
           find firmware -maxdepth 1 -type f -print -exec file {} \;
           test -n "$(find firmware -maxdepth 1 -type f -name '*netcore_n30-pro*squashfs-sysupgrade.bin' -print -quit)"
-          sha256sum firmware/* > firmware/SHA256SUMS
+          # OpenWrt already generates the authoritative `sha256sums` file.
+          # Do not add a second `SHA256SUMS`: GitHub release asset names are
+          # effectively case-insensitive and the two names collide on upload.
           date '+%Y.%m.%d-%H%M' > firmware/BUILD_TAG
           echo "BUILD_TAG=$(cat firmware/BUILD_TAG)" >> "$GITHUB_ENV"
 
