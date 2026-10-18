@@ -9,32 +9,25 @@ CONFIG_MTK_MT_WIFI=m
 CONFIG_MTK_FIRST_IF_EEPROM_FLASH=y
 CONFIG_MTK_FIRST_IF_IPAILNA=y
 CONFIG_PACKAGE_kmod-mt_wifi=y
-# CONFIG_PACKAGE_kmod-mt7915e is not set
-# CONFIG_PACKAGE_kmod-mt7981-firmware is not set
-# CONFIG_PACKAGE_mt7981-wo-firmware is not set
 
 CONFIG_PACKAGE_luci-ssl-openssl=y
 CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
 CONFIG_PACKAGE_luci-app-package-manager=y
-CONFIG_PACKAGE_luci-app-store=y
 CONFIG_PACKAGE_luci-theme-argon=y
 CONFIG_PACKAGE_luci-app-argon-config=y
 CONFIG_PACKAGE_luci-i18n-argon-config-zh-cn=y
 
-CONFIG_PACKAGE_luci-app-openclash=n
-CONFIG_PACKAGE_kmod-tun=y
-CONFIG_PACKAGE_kmod-nft-tproxy=y
-CONFIG_PACKAGE_kmod-inet-diag=y
-CONFIG_PACKAGE_dnsmasq-full=y
-CONFIG_PACKAGE_bash=y
-CONFIG_PACKAGE_curl=y
-CONFIG_PACKAGE_ca-bundle=y
-CONFIG_PACKAGE_ip-full=y
-CONFIG_PACKAGE_ruby=y
-CONFIG_PACKAGE_ruby-yaml=y
-CONFIG_PACKAGE_unzip=y
-CONFIG_PACKAGE_tailscale=y
+# 核心保留：USB与RNDIS随身WiFi网络共享支持
+CONFIG_PACKAGE_kmod-usb-core=y
+CONFIG_PACKAGE_kmod-usb3=y
+CONFIG_PACKAGE_kmod-usb-storage=y
+CONFIG_PACKAGE_kmod-usb-storage-uas=y
+CONFIG_PACKAGE_kmod-usb-net=y
+CONFIG_PACKAGE_kmod-usb-net-rndis=y
+CONFIG_PACKAGE_usb-modeswitch=y
+CONFIG_PACKAGE_usbutils=y
 
+# 基础硬件加速与WiFi网页控制
 CONFIG_PACKAGE_luci-app-mtwifi-cfg=y
 CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn=y
 CONFIG_PACKAGE_mtwifi-cfg=y
@@ -44,18 +37,20 @@ CONFIG_PACKAGE_kmod-mediatek_hnat=y
 CONFIG_PACKAGE_kmod-mtk_wed=y
 CONFIG_PACKAGE_kmod-warp=y
 
+# 核心功能 1：Tailscale 异地组网
+CONFIG_PACKAGE_tailscale=y
+
+# 核心功能 2：ttyd 网页终端
 CONFIG_PACKAGE_luci-app-ttyd=y
 CONFIG_PACKAGE_luci-i18n-ttyd-zh-cn=y
 CONFIG_PACKAGE_ttyd=y
 
+# 核心功能 3：Samba4 局域网文件共享及网络邻居
 CONFIG_PACKAGE_block-mount=y
 CONFIG_PACKAGE_autosamba=y
 CONFIG_PACKAGE_luci-app-samba4=y
 CONFIG_PACKAGE_luci-i18n-samba4-zh-cn=y
 CONFIG_PACKAGE_samba4-server=y
-CONFIG_PACKAGE_kmod-usb3=y
-CONFIG_PACKAGE_kmod-usb-storage=y
-CONFIG_PACKAGE_kmod-usb-storage-uas=y
 CONFIG_PACKAGE_kmod-scsi-core=y
 CONFIG_PACKAGE_kmod-fs-ext4=y
 CONFIG_PACKAGE_kmod-fs-exfat=y
@@ -65,27 +60,18 @@ CONFIG_PACKAGE_exfat-fsck=y
 CONFIG_PACKAGE_ntfs3-mount=y
 CONFIG_PACKAGE_blkid=y
 CONFIG_PACKAGE_lsblk=y
-CONFIG_PACKAGE_usbutils=y
 
-CONFIG_PACKAGE_luci-app-nlbwmon=y
-CONFIG_PACKAGE_luci-i18n-nlbwmon-zh-cn=y
+# 其它基础网络工具
 CONFIG_PACKAGE_luci-app-upnp=y
 CONFIG_PACKAGE_luci-i18n-upnp-zh-cn=y
 CONFIG_PACKAGE_miniupnpd-nftables=y
-CONFIG_PACKAGE_luci-app-filemanager=y
-
-CONFIG_PACKAGE_openssh-sftp-server=y
 CONFIG_PACKAGE_htop=y
-CONFIG_PACKAGE_jq=y
-CONFIG_PACKAGE_openssl-util=y
 CONFIG_PACKAGE_kmod-mtd-rw=y
 
-# CONFIG_PACKAGE_luci-app-diskman is not set
-# CONFIG_PACKAGE_luci-app-dockerman is not set
-# CONFIG_PACKAGE_luci-app-passwall is not set
-# CONFIG_PACKAGE_luci-app-daed is not set
-# CONFIG_PACKAGE_luci-app-easytier is not set
-# CONFIG_PACKAGE_luci-app-openlist2 is not set
-# CONFIG_PACKAGE_luci-app-oaf is not set
-# CONFIG_PACKAGE_luci-app-zerotier is not set
-
+# 彻底清理掉的无用/臃肿插件（设置为n防止残留）
+CONFIG_PACKAGE_luci-app-openclash=n
+CONFIG_PACKAGE_ruby=n
+CONFIG_PACKAGE_ruby-yaml=n
+CONFIG_PACKAGE_luci-app-nlbwmon=n
+CONFIG_PACKAGE_luci-app-filemanager=n
+CONFIG_PACKAGE_luci-app-store=n
