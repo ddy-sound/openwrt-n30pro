@@ -1,15 +1,18 @@
-# Netcore N30 Pro, MT7981B + MT7976 proprietary Wi-Fi
+# Target System Configuration
 CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_mt7981=y
 CONFIG_TARGET_MULTI_PROFILE=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_netcore_n30-pro=y
 
+# MTK Hardware Wi-Fi Support
 CONFIG_MTK_CHIP_MT7981=y
 CONFIG_MTK_MT_WIFI=m
 CONFIG_MTK_FIRST_IF_EEPROM_FLASH=y
 CONFIG_MTK_FIRST_IF_IPAILNA=y
 CONFIG_PACKAGE_kmod-mt_wifi=y
 
+# System UI & Languages
+CONFIG_PACKAGE_luci=y
 CONFIG_PACKAGE_luci-ssl-openssl=y
 CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
 CONFIG_PACKAGE_luci-app-package-manager=y
@@ -17,17 +20,20 @@ CONFIG_PACKAGE_luci-theme-argon=y
 CONFIG_PACKAGE_luci-app-argon-config=y
 CONFIG_PACKAGE_luci-i18n-argon-config-zh-cn=y
 
-# 核心保留：USB与RNDIS随身WiFi网络共享支持
+# USB 3.0 System & Base Utilities (Fix USB Power & Link)
 CONFIG_PACKAGE_kmod-usb-core=y
 CONFIG_PACKAGE_kmod-usb3=y
 CONFIG_PACKAGE_kmod-usb-storage=y
 CONFIG_PACKAGE_kmod-usb-storage-uas=y
+CONFIG_PACKAGE_kmod-scsi-core=y
+CONFIG_PACKAGE_usbutils=y
+
+# USB RNDIS (Mobile/Tethering Link) Support
 CONFIG_PACKAGE_kmod-usb-net=y
 CONFIG_PACKAGE_kmod-usb-net-rndis=y
 CONFIG_PACKAGE_usb-modeswitch=y
-CONFIG_PACKAGE_usbutils=y
 
-# 基础硬件加速与WiFi网页控制
+# Hardware Acceleration & MTK Driver Modules
 CONFIG_PACKAGE_luci-app-mtwifi-cfg=y
 CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn=y
 CONFIG_PACKAGE_mtwifi-cfg=y
@@ -37,21 +43,23 @@ CONFIG_PACKAGE_kmod-mediatek_hnat=y
 CONFIG_PACKAGE_kmod-mtk_wed=y
 CONFIG_PACKAGE_kmod-warp=y
 
-# 核心功能 1：Tailscale 异地组网
+# Feature 1: Tailscale & Core Networking Dependecies
 CONFIG_PACKAGE_tailscale=y
+CONFIG_PACKAGE_dnsmasq-full=y
+CONFIG_PACKAGE_ca-bundle=y
+CONFIG_PACKAGE_ip-full=y
 
-# 核心功能 2：ttyd 网页终端
+# Feature 2: ttyd Web Terminal
 CONFIG_PACKAGE_luci-app-ttyd=y
 CONFIG_PACKAGE_luci-i18n-ttyd-zh-cn=y
 CONFIG_PACKAGE_ttyd=y
 
-# 核心功能 3：Samba4 局域网文件共享及网络邻居
+# Feature 3: Samba4 Filesystem & Mount Utilities
 CONFIG_PACKAGE_block-mount=y
 CONFIG_PACKAGE_autosamba=y
 CONFIG_PACKAGE_luci-app-samba4=y
 CONFIG_PACKAGE_luci-i18n-samba4-zh-cn=y
 CONFIG_PACKAGE_samba4-server=y
-CONFIG_PACKAGE_kmod-scsi-core=y
 CONFIG_PACKAGE_kmod-fs-ext4=y
 CONFIG_PACKAGE_kmod-fs-exfat=y
 CONFIG_PACKAGE_kmod-fs-ntfs3=y
@@ -61,14 +69,14 @@ CONFIG_PACKAGE_ntfs3-mount=y
 CONFIG_PACKAGE_blkid=y
 CONFIG_PACKAGE_lsblk=y
 
-# 其它基础网络工具
+# Optional Network Utilities
 CONFIG_PACKAGE_luci-app-upnp=y
 CONFIG_PACKAGE_luci-i18n-upnp-zh-cn=y
 CONFIG_PACKAGE_miniupnpd-nftables=y
 CONFIG_PACKAGE_htop=y
 CONFIG_PACKAGE_kmod-mtd-rw=y
 
-# 彻底清理掉的无用/臃肿插件（设置为n防止残留）
+# Force Disable Unused Heavy Apps
 CONFIG_PACKAGE_luci-app-openclash=n
 CONFIG_PACKAGE_ruby=n
 CONFIG_PACKAGE_ruby-yaml=n
